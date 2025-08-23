@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin - Announcements</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://unpkg.com/@supabase/supabase-js"></script>
+</head>
+<body>
+  <h1>Admin Panel</h1>
+  
+  <!-- Auth -->
+  <div id="auth"></div>
+  
+  <!-- Add Form -->
+  <div id="form" style="display:none;">
+    <h2>Add Announcement</h2>
+    <form id="announcementForm">
+      <input type="date" id="date" required><br>
+      <input type="text" id="title" placeholder="Title" required><br>
+      <textarea id="description" placeholder="Description" required></textarea><br>
+      <input type="text" id="link" placeholder="Link (optional)"><br>
+      <button type="submit">Post</button>
+    </form>
+
+    <h2>Manage Announcements</h2>
+    <div id="manage"></div>
+  </div>
+
+  <script>
+    const SUPABASE_URL = "https://zeqefyxwhznqiyfgjmrn.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InplcWVmeXh3aHpucWl5ZmdqbXJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc3MjYwNTcsImV4cCI6MjA2MzMwMjA1N30.ktk-5EzJBa7W2zq5ALoYMDrRHrx0wScyiu874g0czaw"; 
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // Show login form
+    document.getElementById("auth").innerHTML = `
+      <h2>Login</h2>
+      <input type="email" id="email" placeholder="Email"><br>
+      <input type="password" id="password" placeholder="Password"><br>
+      <button onclick="login()">Login</button>
+    `;
+
+    async function login() {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+      let { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+      if (error) {
+        alert("Login failed: " + error.message);
+      } else {
+        document.getElementById("auth").style.display = "none";
+        document.getElementById("form").style.display = "block";
+        loadManage();
+      }
+    }
+
+    // Add announcement
+    document.getElementById("announcementForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const { error } = await supabaseClient
+        .from("announcements")
+        .insert([
+          {
+            date: document.getElementById("date").value,
+            title: document.getElementById("title").value,
+            description: document.getElementById("description").value,
+            link: document.getElementById("link").value,
+          }
+        ]);
+
+      if (error) {
+        alert("Error: " + error.message);
+      } else {
+        alert("Announcement added!");
+        loadManage();
+      }
+    });
+
+    // Load announcements for admin
+    async function loadManage() {
+      let { data, error } = await supabaseClient
+        .from("announcements")
+        .select("*")
+        .order("id", { ascending: false });
+
+      if (error) {
+        document.getElementById("manage").innerHTML = "Error loading data";
+        console.error(error);
+        return;
+      }
+
+      let html = "";
+      data.forEach(a => {
+        html += `
+          <div class="announcement">
+            <div class="date">${a.date}</div>
+            <h3>${a.title}</h3>
+            <p>${a.description}</p>
+            <button onclick="deleteAnnouncement(${a.id})">Delete</button>
+          </div>
+        `;
+      });
+      document.getElementById("manage").innerHTML = html || "No announcements yet.";
+    }
+
+    // Delete announcement
+    async function deleteAnnouncement(id) {
+      const { error } = await supabaseClient
+        .from("announcements")
+        .delete()
+        .eq("id", id);
+
+      if (error) {
+        alert("Error deleting: " + error.message);
+      } else {
+        alert("Deleted!");
+        loadManage();
+      }
+    }
+  </script>
+</body>
+</html>
