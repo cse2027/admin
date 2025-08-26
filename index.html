@@ -13,15 +13,17 @@
   <!-- Auth -->
   <div id="auth"></div>
   
-  <!-- Add Form -->
+  <!-- Add/Edit Form -->
   <div id="form" style="display:none;">
-    <h2>Add Announcement</h2>
+    <h2 id="formTitle">Add Announcement</h2>
     <form id="announcementForm">
+      <input type="hidden" id="announcementId"> <!-- hidden for edit -->
       <input type="date" id="date" required><br>
       <input type="text" id="title" placeholder="Title" required><br>
       <textarea id="description" placeholder="Description" required></textarea><br>
       <input type="text" id="link" placeholder="Link (optional)"><br>
-      <button type="submit">Post</button>
+      <button type="submit" id="submitBtn">Post</button>
+      <button type="button" id="cancelEditBtn" style="display:none;" onclick="cancelEdit()">Cancel Edit</button>
     </form>
 
     <h2>Manage Announcements</h2>
@@ -44,7 +46,7 @@
     async function login() {
       const email = document.getElementById("email").value;
       const password = document.getElementById("password").value;
-      let { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+      let { error } = await supabaseClient.auth.signInWithPassword({ email, password });
       if (error) {
         alert("Login failed: " + error.message);
       } else {
@@ -54,24 +56,31 @@
       }
     }
 
-    // Add announcement
+    // Handle add/edit
     document.getElementById("announcementForm").addEventListener("submit", async (e) => {
       e.preventDefault();
-      const { error } = await supabaseClient
-        .from("announcements")
-        .insert([
-          {
-            date: document.getElementById("date").value,
-            title: document.getElementById("title").value,
-            description: document.getElementById("description").value,
-            link: document.getElementById("link").value,
-          }
-        ]);
+      const id = document.getElementById("announcementId").value;
+      const announcement = {
+        date: document.getElementById("date").value,
+        title: document.getElementById("title").value,
+        description: document.getElementById("description").value,
+        link: document.getElementById("link").value,
+      };
+
+      let error;
+      if (id) {
+        // Update existing
+        ({ error } = await supabaseClient.from("announcements").update(announcement).eq("id", id));
+      } else {
+        // Insert new
+        ({ error } = await supabaseClient.from("announcements").insert([announcement]));
+      }
 
       if (error) {
         alert("Error: " + error.message);
       } else {
-        alert("Announcement added!");
+        alert(id ? "Announcement updated!" : "Announcement added!");
+        cancelEdit();
         loadManage();
       }
     });
@@ -96,6 +105,7 @@
             <div class="date">${a.date}</div>
             <h3>${a.title}</h3>
             <p>${a.description}</p>
+            <button onclick="editAnnouncement(${a.id}, '${a.date}', '${a.title.replace(/'/g,"&#39;")}', '${a.description.replace(/'/g,"&#39;")}', '${a.link || ""}')">Edit</button>
             <button onclick="deleteAnnouncement(${a.id})">Delete</button>
           </div>
         `;
@@ -103,13 +113,30 @@
       document.getElementById("manage").innerHTML = html || "No announcements yet.";
     }
 
+    // Edit announcement
+    function editAnnouncement(id, date, title, description, link) {
+      document.getElementById("formTitle").textContent = "Edit Announcement";
+      document.getElementById("announcementId").value = id;
+      document.getElementById("date").value = date;
+      document.getElementById("title").value = title;
+      document.getElementById("description").value = description;
+      document.getElementById("link").value = link;
+      document.getElementById("submitBtn").textContent = "Update";
+      document.getElementById("cancelEditBtn").style.display = "inline-block";
+    }
+
+    // Cancel edit mode
+    function cancelEdit() {
+      document.getElementById("formTitle").textContent = "Add Announcement";
+      document.getElementById("announcementId").value = "";
+      document.getElementById("announcementForm").reset();
+      document.getElementById("submitBtn").textContent = "Post";
+      document.getElementById("cancelEditBtn").style.display = "none";
+    }
+
     // Delete announcement
     async function deleteAnnouncement(id) {
-      const { error } = await supabaseClient
-        .from("announcements")
-        .delete()
-        .eq("id", id);
-
+      const { error } = await supabaseClient.from("announcements").delete().eq("id", id);
       if (error) {
         alert("Error deleting: " + error.message);
       } else {
